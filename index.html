@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MIKU AI STUDIO — 初音ミク</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --miku: #00e5ff;
+  --miku2: #1de9b6;
+  --pink: #ff4dd2;
+  --deep: #03060d;
+  --teal: #00bcd4;
+  --glow: 0 0 30px rgba(0,229,255,0.7);
+  --glow2: 0 0 60px rgba(0,229,255,0.4);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  width:100%; height:100%;
+  overflow:hidden;
+  background:var(--deep);
+  color:#fff;
+  font-family:'Rajdhani', sans-serif;
+}
+
+/* ——— THREE.JS CANVAS ——— */
+#bg-canvas {
+  position:fixed;
+  inset:0;
+  z-index:0;
+}
+
+/* ——— SCAN LINES OVERLAY ——— */
+.scanlines {
+  position:fixed;
+  inset:0;
+  z-index:1;
+  pointer-events:none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
+  );
+}
+
+/* ——— VIGNETTE ——— */
+.vignette {
+  position:fixed;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%);
+}
+
+/* ——— HUD CORNERS ——— */
+.hud-corner {
+  position:fixed;
+  width:60px; height:60px;
+  z-index:10;
+  pointer-events:none;
+}
+.hud-corner::before, .hud-corner::after {
+  content:'';
+  position:absolute;
+  background:var(--miku);
+}
+.hud-corner::before { width:2px; height:100%; }
+.hud-corner::after { width:100%; height:2px; }
+.hud-corner.tl { top:20px; left:20px; }
+.hud-corner.tr { top:20px; right:20px; transform:scaleX(-1); }
+.hud-corner.bl { bottom:20px; left:20px; transform:scaleY(-1); }
+.hud-corner.br { bottom:20px; right:20px; transform:scale(-1); }
+
+/* ——— APP LAYOUT ——— */
+.app {
+  display:flex;
+  height:100vh;
+  position:relative;
+  z-index:5;
+}
+
+/* ——— SIDEBAR ——— */
+.sidebar {
+  width:280px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:40px 20px 30px;
+  background: linear-gradient(180deg, rgba(0,229,255,0.04) 0%, transparent 100%);
+  border-right:1px solid rgba(0,229,255,0.15);
+  backdrop-filter:blur(20px);
+  position:relative;
+  overflow:hidden;
+}
+
+.sidebar::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+  background: linear-gradient(90deg, transparent, var(--miku), transparent);
+  animation: scanH 3s linear infinite;
+}
+
+@keyframes scanH {
+  0% { transform: scaleX(0); opacity:0; }
+  50% { transform: scaleX(1); opacity:1; }
+  100% { transform: scaleX(0); opacity:0; }
+}
+
+/* ——— JARVIS ORB ——— */
+.jarvis-wrap {
+  position:relative;
+  width:220px;
+  height:220px;
+  margin-bottom:14px;
+  flex-shrink:0;
+}
+
+#jarvisCanvas {
+  width:220px;
+  height:220px;
+  border-radius:50%;
+  display:block;
+  filter:drop-shadow(0 0 18px rgba(0,229,255,0.6)) drop-shadow(0 0 40px rgba(0,229,255,0.25));
+}
+
+.jarvis-label {
+  position:absolute;
+  bottom:-2px;
+  left:50%;
+  transform:translateX(-50%);
+  font-family:'Orbitron';
+  font-size:0.5rem;
+  letter-spacing:4px;
+  color:rgba(0,229,255,0.5);
+  white-space:nowrap;
+}
+
+/* ——— SIDEBAR TEXT ——— */
+.miku-title {
+  font-family:'Orbitron', sans-serif;
+  font-size:1.1rem;
+  font-weight:900;
+  letter-spacing:4px;
+  color:var(--miku);
+  text-shadow:var(--glow);
+  margin-bottom:4px;
+}
+.miku-sub {
+  font-family:'Noto Sans JP', sans-serif;
+  font-size:0.7rem;
+  color:rgba(0,229,255,0.6);
+  letter-spacing:3px;
+  margin-bottom:24px;
+}
+
+/* status pills */
+.status-row {
+  display:flex;
+  gap:8px;
+  margin-bottom:24px;
+}
+.status-pill {
+  padding:4px 10px;
+  border-radius:20px;
+  font-size:0.65rem;
+  font-weight:700;
+  letter-spacing:1px;
+  border:1px solid;
+}
+.status-pill.online { color:#00e676; border-color:#00e676; background:rgba(0,230,118,0.1); }
+.status-pill.v4 { color:var(--miku); border-color:var(--miku); background:rgba(0,229,255,0.08); }
+
+/* theme toggle */
+.theme-toggle {
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid rgba(0,229,255,0.3);
+  background:rgba(0,229,255,0.06);
+  color:var(--miku);
+  font-family:'Orbitron';
+  font-size:0.6rem;
+  letter-spacing:2px;
+  cursor:pointer;
+  transition:all 0.3s;
+  margin-top:10px;
+  margin-bottom:16px;
+}
+.theme-toggle:hover {
+  background:rgba(0,229,255,0.15);
+  box-shadow:var(--glow);
+}
+
+/* sidebar stats */
+.stats-panel {
+  width:100%;
+  margin-top:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.stat-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:0.7rem;
+  color:rgba(255,255,255,0.5);
+  letter-spacing:1px;
+}
+.stat-bar {
+  width:100%;
+  height:2px;
+  background:rgba(255,255,255,0.08);
+  border-radius:2px;
+  margin-top:4px;
+  overflow:hidden;
+}
+.stat-fill {
+  height:100%;
+  background:linear-gradient(90deg, var(--miku), var(--miku2));
+  border-radius:2px;
+  animation:fillAnim 1.5s ease-out forwards;
+}
+
+@keyframes fillAnim {
+  from{ width:0; }
+}
+
+/* ——— MAIN CHAT AREA ——— */
+.chat-container {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  backdrop-filter:blur(10px);
+}
+
+/* ——— HEADER ——— */
+.header {
+  padding:20px 30px;
+  border-bottom:1px solid rgba(0,229,255,0.12);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:rgba(0,0,0,0.2);
+}
+
+.header-title {
+  font-family:'Orbitron';
+  font-size:0.75rem;
+  letter-spacing:4px;
+  color:var(--miku);
+  text-shadow:var(--glow);
+}
+
+.header-dots {
+  display:flex;
+  gap:8px;
+}
+
+.hdot {
+  width:8px; height:8px;
+  border-radius:50%;
+}
+.hdot:nth-child(1){ background:#ff4dd2; box-shadow:0 0 8px #ff4dd2; }
+.hdot:nth-child(2){ background:#ffeb3b; box-shadow:0 0 8px #ffeb3b; }
+.hdot:nth-child(3){ background:#00e676; box-shadow:0 0 8px #00e676; animation:pulse-dot 1.5s infinite; }
+
+@keyframes pulse-dot {
+  0%,100%{ opacity:1; }
+  50%{ opacity:0.3; }
+}
+
+/* ——— CHAT BOX ——— */
+.chat-box {
+  flex:1;
+  padding:30px;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(0,229,255,0.3) transparent;
+}
+
+.chat-box::-webkit-scrollbar { width:4px; }
+.chat-box::-webkit-scrollbar-thumb { background:rgba(0,229,255,0.3); border-radius:2px; }
+
+/* welcome screen */
+.welcome-screen {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:30px;
+  text-align:center;
+}
+
+.welcome-miku-text {
+  font-family:'Orbitron';
+  font-size:3rem;
+  font-weight:900;
+  line-height:1;
+  background:linear-gradient(135deg, var(--miku) 0%, var(--miku2) 50%, var(--pink) 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  filter:drop-shadow(0 0 20px rgba(0,229,255,0.5));
+  animation:textGlitch 8s infinite;
+}
+
+@keyframes textGlitch {
+  0%,88%,100%{ transform:none; filter:drop-shadow(0 0 20px rgba(0,229,255,0.5)); }
+  90%{ transform:skewX(3deg) translateX(3px); filter:drop-shadow(4px 0 0 #ff4dd2) drop-shadow(-4px 0 0 var(--miku)); }
+  92%{ transform:skewX(-2deg) translateX(-2px); }
+  94%{ transform:none; }
+}
+
+.welcome-jp {
+  font-family:'Noto Sans JP';
+  font-size:0.9rem;
+  color:rgba(0,229,255,0.5);
+  letter-spacing:8px;
+  margin-top:-20px;
+}
+
+.welcome-desc {
+  max-width:400px;
+  font-size:1rem;
+  font-weight:300;
+  color:rgba(255,255,255,0.5);
+  line-height:1.8;
+  letter-spacing:1px;
+}
+
+.quick-btns {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+  max-width:500px;
+}
+
+.quick-btn {
+  padding:10px 20px;
+  border-radius:6px;
+  border:1px solid rgba(0,229,255,0.25);
+  background:rgba(0,229,255,0.05);
+  color:rgba(255,255,255,0.7);
+  font-family:'Rajdhani';
+  font-size:0.85rem;
+  letter-spacing:1px;
+  cursor:pointer;
+  transition:all 0.3s;
+}
+
+.quick-btn:hover {
+  border-color:var(--miku);
+  color:var(--miku);
+  background:rgba(0,229,255,0.1);
+  box-shadow:0 0 20px rgba(0,229,255,0.2);
+  transform:translateY(-2px);
+}
+
+/* messages */
+.message {
+  max-width:72%;
+  padding:18px 22px;
+  border-radius:16px;
+  line-height:1.7;
+  animation:msgIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  font-size:0.95rem;
+  letter-spacing:0.5px;
+  position:relative;
+}
+
+@keyframes msgIn {
+  from{ opacity:0; transform:translateY(20px) scale(0.95); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+
+.user {
+  align-self:flex-end;
+  background:linear-gradient(135deg,rgba(0,229,255,0.2), rgba(29,233,182,0.2));
+  border:1px solid rgba(0,229,255,0.4);
+  color:#e0fffe;
+}
+
+.bot {
+  align-self:flex-start;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(0,229,255,0.15);
+  color:rgba(255,255,255,0.85);
+}
+
+.bot::before {
+  content:'MIKU ▸';
+  display:block;
+  font-size:0.6rem;
+  font-family:'Orbitron';
+  letter-spacing:2px;
+  color:var(--miku);
+  margin-bottom:8px;
+}
+
+/* ——— INPUT AREA ——— */
+.input-area {
+  padding:20px 30px;
+  border-top:1px solid rgba(0,229,255,0.12);
+  display:flex;
+  gap:12px;
+  align-items:center;
+  background:rgba(0,0,0,0.2);
+}
+
+.input-wrap {
+  flex:1;
+  position:relative;
+}
+
+.input-wrap::before {
+  content:'';
+  position:absolute;
+  bottom:0; left:10%; right:10%;
+  height:1px;
+  background:linear-gradient(90deg, transparent, var(--miku), transparent);
+  opacity:0;
+  transition:opacity 0.3s;
+}
+
+.input-wrap:focus-within::before { opacity:1; }
+
+input {
+  width:100%;
+  padding:16px 20px;
+  border-radius:10px;
+  border:1px solid rgba(0,229,255,0.2);
+  background:rgba(255,255,255,0.03);
+  color:#fff;
+  outline:none;
+  font-family:'Rajdhani';
+  font-size:1rem;
+  letter-spacing:1px;
+  transition:all 0.3s;
+}
+
+input::placeholder { color:rgba(0,229,255,0.3); }
+
+input:focus {
+  border-color:rgba(0,229,255,0.5);
+  background:rgba(0,229,255,0.04);
+  box-shadow:0 0 20px rgba(0,229,255,0.1);
+}
+
+.send-btn {
+  padding:16px 28px;
+  border-radius:10px;
+  border:none;
+  background:linear-gradient(135deg, var(--miku), var(--miku2));
+  color:#001a1f;
+  font-family:'Orbitron';
+  font-size:0.6rem;
+  font-weight:700;
+  letter-spacing:2px;
+  cursor:pointer;
+  transition:all 0.3s;
+  position:relative;
+  overflow:hidden;
+}
+
+.send-btn::after {
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.3));
+  transform:translateX(-100%);
+  transition:transform 0.4s;
+}
+
+.send-btn:hover {
+  transform:translateY(-2px);
+  box-shadow:0 0 30px rgba(0,229,255,0.5);
+}
+
+.send-btn:hover::after { transform:translateX(100%); }
+
+/* ——— FLOATING NOTE PARTICLES ——— */
+.note {
+  position:fixed;
+  font-size:1.2rem;
+  pointer-events:none;
+  z-index:3;
+  animation:floatNote linear forwards;
+  color:var(--miku);
+  text-shadow:0 0 10px var(--miku);
+  opacity:0;
+}
+
+@keyframes floatNote {
+  0%{ opacity:0; transform:translateY(0) rotate(0deg); }
+  10%{ opacity:0.8; }
+  90%{ opacity:0.4; }
+  100%{ opacity:0; transform:translateY(-200px) rotate(180deg) scale(0); }
+}
+
+/* ——— MIDNIGHT THEME ——— */
+body.midnight {
+  --miku:#ff4dd2;
+  --miku2:#aa00ff;
+  --teal:#cc00ff;
+}
+
+/* ——— LOADING INTRO ——— */
+.intro-overlay {
+  position:fixed;
+  inset:0;
+  z-index:100;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:#000;
+  gap:20px;
+  transition:opacity 0.8s ease;
+}
+
+.intro-logo {
+  font-family:'Orbitron';
+  font-size:2.5rem;
+  font-weight:900;
+  color:var(--miku);
+  text-shadow:var(--glow);
+  letter-spacing:8px;
+  animation:introLogo 0.5s ease forwards;
+}
+
+@keyframes introLogo {
+  from{ opacity:0; transform:scale(0.8); }
+  to{ opacity:1; transform:scale(1); }
+}
+
+.intro-jp {
+  font-family:'Noto Sans JP';
+  font-size:0.8rem;
+  color:rgba(0,229,255,0.5);
+  letter-spacing:6px;
+  animation:fadeSlide 0.6s 0.3s ease both;
+}
+
+@keyframes fadeSlide {
+  from{ opacity:0; transform:translateY(10px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+.intro-bar {
+  width:300px;
+  height:2px;
+  background:rgba(255,255,255,0.1);
+  border-radius:2px;
+  overflow:hidden;
+  margin-top:10px;
+}
+
+.intro-bar-fill {
+  height:100%;
+  background:linear-gradient(90deg, var(--miku), var(--miku2));
+  width:0%;
+  animation:introFill 1.8s 0.5s ease forwards;
+}
+
+@keyframes introFill {
+  to{ width:100%; }
+}
+
+/* ——— WAVEFORM VISUALIZER ——— */
+.wave-bar-container {
+  display:flex;
+  gap:3px;
+  align-items:center;
+  height:30px;
+}
+
+.wave-bar {
+  width:3px;
+  border-radius:2px;
+  background:linear-gradient(180deg, var(--miku), var(--miku2));
+  box-shadow:0 0 6px var(--miku);
+  animation:wavePulse 0.8s ease-in-out infinite;
+}
+
+@keyframes wavePulse {
+  0%,100%{ height:6px; }
+  50%{ height:28px; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- INTRO OVERLAY -->
+<div class="intro-overlay" id="introOverlay">
+  <div class="intro-logo">初音ミク</div>
+  <div class="intro-jp">HATSUNE MIKU AI STUDIO</div>
+  <div class="intro-bar"><div class="intro-bar-fill"></div></div>
+</div>
+
+<!-- THREE.JS CANVAS -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- OVERLAYS -->
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<!-- HUD CORNERS -->
+<div class="hud-corner tl"></div>
+<div class="hud-corner tr"></div>
+<div class="hud-corner bl"></div>
+<div class="hud-corner br"></div>
+
+<!-- APP -->
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="jarvis-wrap">
+      <canvas id="jarvisCanvas" width="220" height="220"></canvas>
+      <div class="jarvis-label">NEURAL CORE ACTIVE</div>
+    </div>
+
+    <div class="miku-title">MIKU AI</div>
+    <div class="miku-sub">初音ミク / VOCALOID STUDIO</div>
+
+    <div class="status-row">
+      <div class="status-pill online">● ONLINE</div>
+      <div class="status-pill v4">V4X ENGINE</div>
+    </div>
+
+    <div class="wave-bar-container" id="waveViz">
+      <!-- generated by JS -->
+    </div>
+
+    <button class="theme-toggle" onclick="toggleTheme()">⟳ SWITCH THEME</button>
+
+    <div class="stats-panel">
+      <div>
+        <div class="stat-row"><span>VOCAL CLARITY</span><span style="color:var(--miku)">98%</span></div>
+        <div class="stat-bar"><div class="stat-fill" style="width:98%"></div></div>
+      </div>
+      <div>
+        <div class="stat-row"><span>PITCH PRECISION</span><span style="color:var(--miku)">95%</span></div>
+        <div class="stat-bar"><div class="stat-fill" style="width:95%; animation-delay:0.2s"></div></div>
+      </div>
+      <div>
+        <div class="stat-row"><span>EMOTION ENGINE</span><span style="color:var(--miku)">87%</span></div>
+        <div class="stat-bar"><div class="stat-fill" style="width:87%; animation-delay:0.4s"></div></div>
+      </div>
+      <div>
+        <div class="stat-row"><span>CREATIVITY INDEX</span><span style="color:var(--miku)">∞</span></div>
+        <div class="stat-bar"><div class="stat-fill" style="width:100%; animation-delay:0.6s"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT AREA -->
+  <div class="chat-container">
+    <div class="header">
+      <div class="header-title">VOCALOID NEURAL STUDIO // SESSION ACTIVE</div>
+      <div class="header-dots">
+        <div class="hdot"></div>
+        <div class="hdot"></div>
+        <div class="hdot"></div>
+      </div>
+    </div>
+
+    <div class="chat-box" id="chatBox">
+      <div class="welcome-screen" id="welcomeScreen">
+        <div>
+          <div class="welcome-miku-text">HATSUNE MIKU</div>
+          <div class="welcome-jp">人工知能ボーカルスタジオ</div>
+        </div>
+        <div class="welcome-desc">
+          AI-Powered Vocaloid Neural Studio. Ask about music composition, lyrics, vocal synthesis, or anything about the world of Miku.
+        </div>
+        <div class="quick-btns">
+          <div class="quick-btn" onclick="quickMsg('Compose a melody for me')">🎵 Compose Melody</div>
+          <div class="quick-btn" onclick="quickMsg('Write lyrics in Miku style')">✍️ Write Lyrics</div>
+          <div class="quick-btn" onclick="quickMsg('Tell me about vocaloid synthesis')">🔬 Vocal Synthesis</div>
+          <div class="quick-btn" onclick="quickMsg('Create a song concept')">💡 Song Concept</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-wrap">
+        <input id="messageInput" placeholder="Ask Miku anything... / ミクに何でも聞いてください" />
+      </div>
+      <button class="send-btn" onclick="sendMessage()">SEND ▸</button>
+    </div>
+  </div>
+</div>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ——— INTRO DISMISS ———
+setTimeout(() => {
+  const intro = document.getElementById('introOverlay');
+  intro.style.opacity = '0';
+  setTimeout(() => intro.remove(), 800);
+}, 2400);
+
+// ——— WAVE BARS ———
+const waveViz = document.getElementById('waveViz');
+for(let i=0; i<12; i++){
+  const bar = document.createElement('div');
+  bar.classList.add('wave-bar');
+  bar.style.animationDelay = (i * 0.07) + 's';
+  bar.style.animationDuration = (0.6 + Math.random() * 0.6) + 's';
+  waveViz.appendChild(bar);
+}
+
+// ——— THREE.JS SCENE ———
+const canvas = document.getElementById('bg-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.z = 5;
+
+// Miku cyan color
+const mikuColor = new THREE.Color(0x00e5ff);
+const pinkColor = new THREE.Color(0xff4dd2);
+const tealColor = new THREE.Color(0x1de9b6);
+
+// ——— STARFIELD ———
+const starGeo = new THREE.BufferGeometry();
+const starCount = 1500;
+const starPos = new Float32Array(starCount * 3);
+const starColors = new Float32Array(starCount * 3);
+for(let i=0; i<starCount; i++){
+  starPos[i*3] = (Math.random()-0.5)*80;
+  starPos[i*3+1] = (Math.random()-0.5)*80;
+  starPos[i*3+2] = (Math.random()-0.5)*80;
+  const c = Math.random() < 0.7 ? mikuColor : (Math.random() < 0.5 ? pinkColor : tealColor);
+  starColors[i*3] = c.r;
+  starColors[i*3+1] = c.g;
+  starColors[i*3+2] = c.b;
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+const starMat = new THREE.PointsMaterial({ size:0.06, vertexColors:true, transparent:true, opacity:0.8 });
+const stars = new THREE.Points(starGeo, starMat);
+scene.add(stars);
+
+// ——— FLOATING TORUS RINGS ———
+const rings = [];
+for(let i=0; i<5; i++){
+  const geo = new THREE.TorusGeometry(1.5 + i*0.8, 0.008, 8, 80);
+  const mat = new THREE.MeshBasicMaterial({
+    color: i%2===0 ? mikuColor : pinkColor,
+    transparent:true,
+    opacity:0.2 + i*0.05,
+    wireframe:false
+  });
+  const ring = new THREE.Mesh(geo, mat);
+  ring.rotation.x = Math.random() * Math.PI;
+  ring.rotation.y = Math.random() * Math.PI;
+  ring.userData = {
+    rotX: (Math.random()-0.5)*0.003,
+    rotY: (Math.random()-0.5)*0.003,
+    rotZ: (Math.random()-0.5)*0.003
+  };
+  scene.add(ring);
+  rings.push(ring);
+}
+
+// ——— HOLOGRAPHIC GRID PLANE ———
+const gridGeo = new THREE.PlaneGeometry(30, 30, 30, 30);
+const gridMat = new THREE.MeshBasicMaterial({
+  color:mikuColor,
+  wireframe:true,
+  transparent:true,
+  opacity:0.05
+});
+const grid = new THREE.Mesh(gridGeo, gridMat);
+grid.rotation.x = -Math.PI / 2;
+grid.position.y = -4;
+scene.add(grid);
+
+// ——— DNA HELIX / AUDIO WAVE RIBBON ———
+const waveGeo = new THREE.BufferGeometry();
+const wavePoints = [];
+const waveCount = 200;
+for(let i=0; i<waveCount; i++){
+  const t = (i/waveCount) * Math.PI * 4 - Math.PI*2;
+  wavePoints.push(new THREE.Vector3(
+    Math.sin(t) * 2,
+    (i/waveCount - 0.5) * 8,
+    Math.cos(t) * 2
+  ));
+}
+waveGeo.setFromPoints(wavePoints);
+const waveMat = new THREE.LineBasicMaterial({ color:mikuColor, transparent:true, opacity:0.4 });
+const waveLine = new THREE.Line(waveGeo, waveMat);
+waveLine.position.x = -6;
+scene.add(waveLine);
+
+// second helix strand
+const wave2Geo = new THREE.BufferGeometry();
+const wave2Points = [];
+for(let i=0; i<waveCount; i++){
+  const t = (i/waveCount) * Math.PI * 4 - Math.PI*2;
+  wave2Points.push(new THREE.Vector3(
+    Math.sin(t + Math.PI) * 2,
+    (i/waveCount - 0.5) * 8,
+    Math.cos(t + Math.PI) * 2
+  ));
+}
+wave2Geo.setFromPoints(wave2Points);
+const wave2Mat = new THREE.LineBasicMaterial({ color:pinkColor, transparent:true, opacity:0.35 });
+const wave2Line = new THREE.Line(wave2Geo, wave2Mat);
+wave2Line.position.x = -6;
+scene.add(wave2Line);
+
+// ——— ICOSAHEDRON WIREFRAME ———
+const icoGeo = new THREE.IcosahedronGeometry(1.5, 1);
+const icoMat = new THREE.MeshBasicMaterial({ color:mikuColor, wireframe:true, transparent:true, opacity:0.15 });
+const ico = new THREE.Mesh(icoGeo, icoMat);
+ico.position.set(5, 1, -3);
+scene.add(ico);
+
+// ——— FLOATING PARTICLES ———
+const partGeo = new THREE.BufferGeometry();
+const partCount = 300;
+const partPos = new Float32Array(partCount * 3);
+const partVel = [];
+for(let i=0; i<partCount; i++){
+  partPos[i*3] = (Math.random()-0.5)*20;
+  partPos[i*3+1] = (Math.random()-0.5)*15;
+  partPos[i*3+2] = (Math.random()-0.5)*10;
+  partVel.push({
+    x:(Math.random()-0.5)*0.01,
+    y:(Math.random()-0.5)*0.01,
+    z:(Math.random()-0.5)*0.005
+  });
+}
+partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
+const partMat = new THREE.PointsMaterial({ size:0.05, color:mikuColor, transparent:true, opacity:0.7 });
+const particles = new THREE.Points(partGeo, partMat);
+scene.add(particles);
+
+// ——— AUDIO FREQUENCY BARS (decorative) ———
+const bars = [];
+const barGroup = new THREE.Group();
+barGroup.position.set(0, -4, -2);
+const barCount = 32;
+for(let i=0; i<barCount; i++){
+  const h = 0.3;
+  const barGeo = new THREE.BoxGeometry(0.15, h, 0.15);
+  const barMat = new THREE.MeshBasicMaterial({
+    color: i<barCount/2 ? mikuColor : pinkColor,
+    transparent:true,
+    opacity:0.6
+  });
+  const bar = new THREE.Mesh(barGeo, barMat);
+  bar.position.x = (i - barCount/2) * 0.2;
+  bar.userData.baseY = 0;
+  bar.userData.phase = i * 0.3;
+  barGroup.add(bar);
+  bars.push(bar);
+}
+scene.add(barGroup);
+
+// ——— MOUSE INTERACTION ———
+let mouse = { x:0, y:0 };
+document.addEventListener('mousemove', e=>{
+  mouse.x = (e.clientX / window.innerWidth - 0.5) * 2;
+  mouse.y = -(e.clientY / window.innerHeight - 0.5) * 2;
+});
+
+// ——— ANIMATION LOOP ———
+let t = 0;
+function animate(){
+  requestAnimationFrame(animate);
+  t += 0.01;
+
+  // camera drift with mouse
+  camera.position.x += (mouse.x * 0.8 - camera.position.x) * 0.05;
+  camera.position.y += (mouse.y * 0.5 - camera.position.y) * 0.05;
+  camera.lookAt(0, 0, 0);
+
+  // stars rotate
+  stars.rotation.y += 0.0003;
+  stars.rotation.x += 0.0001;
+
+  // rings
+  rings.forEach(r=>{
+    r.rotation.x += r.userData.rotX;
+    r.rotation.y += r.userData.rotY;
+    r.rotation.z += r.userData.rotZ;
+  });
+
+  // helix rotation
+  waveLine.rotation.y = t * 0.3;
+  wave2Line.rotation.y = t * 0.3;
+
+  // ico
+  ico.rotation.x += 0.004;
+  ico.rotation.y += 0.006;
+
+  // grid wave
+  const gPos = gridGeo.attributes.position;
+  for(let i=0; i<gPos.count; i++){
+    const x = gPos.getX(i);
+    const z = gPos.getY(i);
+    gPos.setZ(i, Math.sin(x*0.5 + t)*0.2 + Math.cos(z*0.5 + t*1.2)*0.15);
+  }
+  gPos.needsUpdate = true;
+
+  // frequency bars animation
+  bars.forEach((bar, i)=>{
+    const h = 0.2 + Math.abs(Math.sin(t * 2 + bar.userData.phase)) * 2.5;
+    bar.scale.y = h;
+    bar.position.y = h * 0.075;
+  });
+
+  // floating particles
+  const pp = partGeo.attributes.position;
+  for(let i=0; i<partCount; i++){
+    let x = pp.getX(i) + partVel[i].x;
+    let y = pp.getY(i) + partVel[i].y;
+    let z = pp.getZ(i) + partVel[i].z;
+    if(Math.abs(x)>10) partVel[i].x *= -1;
+    if(Math.abs(y)>7.5) partVel[i].y *= -1;
+    if(Math.abs(z)>5) partVel[i].z *= -1;
+    pp.setXYZ(i, x, y, z);
+  }
+  pp.needsUpdate = true;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+// ——— RESIZE ———
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+// ——— THEME TOGGLE ———
+function toggleTheme(){
+  document.body.classList.toggle('midnight');
+  const isMidnight = document.body.classList.contains('midnight');
+  mikuColor.set(isMidnight ? 0xff4dd2 : 0x00e5ff);
+  starMat.color = mikuColor;
+  partMat.color = mikuColor;
+  waveMat.color = mikuColor;
+  icoMat.color = mikuColor;
+  gridMat.color = mikuColor;
+}
+
+// ——— MUSIC NOTE PARTICLES ———
+const notes = ['♩','♪','♫','♬','𝄞','𝄢'];
+function spawnNote(){
+  const el = document.createElement('div');
+  el.classList.add('note');
+  el.textContent = notes[Math.floor(Math.random()*notes.length)];
+  el.style.left = (Math.random()*100) + 'vw';
+  el.style.bottom = (Math.random()*30 + 10) + 'vh';
+  el.style.fontSize = (0.8 + Math.random()*1.5) + 'rem';
+  el.style.animationDuration = (3 + Math.random()*4) + 's';
+  el.style.color = Math.random() < 0.5 ? 'var(--miku)' : 'var(--pink)';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 7000);
+}
+setInterval(spawnNote, 800);
+
+// ——— CHAT LOGIC ———
+const chatBox = document.getElementById('chatBox');
+const input = document.getElementById('messageInput');
+const welcomeScreen = document.getElementById('welcomeScreen');
+let welcomeHidden = false;
+
+function hideWelcome(){
+  if(!welcomeHidden){
+    welcomeScreen.style.display = 'none';
+    welcomeHidden = true;
+  }
+}
+
+function addUserMsg(text){
+  hideWelcome();
+  const msg = document.createElement('div');
+  msg.classList.add('message','user');
+  msg.textContent = text;
+  chatBox.appendChild(msg);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function streamBotMsg(text){
+  const msg = document.createElement('div');
+  msg.classList.add('message','bot');
+  chatBox.appendChild(msg);
+  let i = 0;
+  function type(){
+    if(i < text.length){
+      msg.textContent += text.charAt(i);
+      i++;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      setTimeout(type, 10);
+    }
+  }
+  type();
+}
+
+async function sendMessage(){
+  const message = input.value.trim();
+  if(!message) return;
+  addUserMsg(message);
+  input.value = '';
+  try {
+    const response = await fetch('http://127.0.0.1:8000/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({user_id:'user123', question:message})
+    });
+    const data = await response.json();
+    streamBotMsg(data.response);
+  } catch(e) {
+    streamBotMsg("[ NEURAL LINK DISCONNECTED ]\n\nBackend at localhost:8000 is not reachable. Please connect your server and try again, or I'll sing you a song instead. ♪");
+  }
+}
+
+function quickMsg(text){
+  input.value = text;
+  sendMessage();
+}
+
+input.addEventListener('keypress', e=>{
+  if(e.key === 'Enter') sendMessage();
+});
+
+// ——— JARVIS ORB ———
+(function(){
+  const jc = document.getElementById('jarvisCanvas');
+  const jx = jc.getContext('2d');
+  const W = 220, H = 220, CX = W/2, CY = H/2;
+  let jt = 0;
+
+  // Arc ring definitions: [radius, thickness, speed, dashRatio, color, direction]
+  const rings = [
+    { r:98,  lw:1,   spd:0.004,  dash:0.18, col:'rgba(0,229,255,0.9)',  dir:1  },
+    { r:90,  lw:0.6, spd:-0.007, dash:0.08, col:'rgba(0,229,255,0.4)',  dir:-1 },
+    { r:80,  lw:1.5, spd:0.011,  dash:0.35, col:'rgba(29,233,182,0.85)',dir:1  },
+    { r:72,  lw:0.5, spd:-0.015, dash:0.12, col:'rgba(0,229,255,0.35)', dir:-1 },
+    { r:62,  lw:1.2, spd:0.018,  dash:0.5,  col:'rgba(0,200,230,0.7)',  dir:1  },
+    { r:52,  lw:0.8, spd:-0.022, dash:0.25, col:'rgba(255,77,210,0.5)', dir:-1 },
+    { r:42,  lw:1.8, spd:0.028,  dash:0.6,  col:'rgba(0,229,255,0.6)',  dir:1  },
+    { r:32,  lw:0.6, spd:-0.035, dash:0.15, col:'rgba(29,233,182,0.5)', dir:-1 },
+    { r:22,  lw:2,   spd:0.045,  dash:0.7,  col:'rgba(0,229,255,0.8)',  dir:1  },
+    { r:13,  lw:1,   spd:-0.06,  dash:0.4,  col:'rgba(255,77,210,0.6)', dir:-1 },
+  ];
+
+  // Floating data nodes
+  const nodes = Array.from({length:12}, (_,i)=>({
+    angle: (i/12)*Math.PI*2,
+    r: 55 + Math.random()*38,
+    spd: (Math.random()-0.5)*0.012,
+    size: 1.5 + Math.random()*2,
+    alpha: 0.4 + Math.random()*0.5,
+  }));
+
+  // Waveform points around a circle (for the pulsing sonic ring)
+  const WAVE_PTS = 120;
+
+  function drawJarvis(){
+    jx.clearRect(0,0,W,H);
+
+    // Deep background radial
+    const bg = jx.createRadialGradient(CX,CY,0, CX,CY,105);
+    bg.addColorStop(0,'rgba(0,20,35,0.95)');
+    bg.addColorStop(0.5,'rgba(0,10,20,0.8)');
+    bg.addColorStop(1,'rgba(0,0,10,0)');
+    jx.beginPath();
+    jx.arc(CX,CY,105,0,Math.PI*2);
+    jx.fillStyle=bg;
+    jx.fill();
+
+    // ── Spinning arc rings ──
+    rings.forEach(ring=>{
+      const offset = ring.angle + jt * ring.spd * ring.dir;
+      const arcLen = Math.PI*2 * ring.dash;
+      const gap = Math.PI*2 - arcLen;
+      const segments = Math.floor(1/ring.dash * 0.5) + 1;
+
+      jx.save();
+      jx.translate(CX,CY);
+      jx.rotate(offset);
+
+      jx.shadowBlur = ring.lw > 1.2 ? 10 : 5;
+      jx.shadowColor = ring.col;
+      jx.strokeStyle = ring.col;
+      jx.lineWidth = ring.lw;
+      jx.lineCap = 'round';
+
+      for(let s=0; s<segments; s++){
+        const start = s*(arcLen+gap);
+        const end = start + arcLen;
+        jx.beginPath();
+        jx.arc(0,0,ring.r,start,end);
+        jx.stroke();
+      }
+      jx.restore();
+      ring.angle = (ring.angle||0);
+    });
+
+    // ── Pulsing sonic waveform ring ──
+    const pulseR = 68;
+    const pulse = 6 + Math.sin(jt*1.8)*4 + Math.sin(jt*3.1)*2;
+    jx.save();
+    jx.translate(CX,CY);
+    jx.beginPath();
+    for(let i=0;i<=WAVE_PTS;i++){
+      const a = (i/WAVE_PTS)*Math.PI*2;
+      const noise = Math.sin(a*6+jt*2.5)*pulse*0.5
+                  + Math.sin(a*11+jt*1.7)*pulse*0.25
+                  + Math.sin(a*3-jt*3.3)*pulse*0.35;
+      const r = pulseR + noise;
+      const x = Math.cos(a)*r, y = Math.sin(a)*r;
+      i===0 ? jx.moveTo(x,y) : jx.lineTo(x,y);
+    }
+    jx.closePath();
+    jx.strokeStyle='rgba(0,229,255,0.55)';
+    jx.lineWidth=1.5;
+    jx.shadowBlur=14;
+    jx.shadowColor='rgba(0,229,255,0.8)';
+    jx.stroke();
+    jx.restore();
+
+    // ── Second waveform (pink, offset phase) ──
+    const pulseR2 = 58;
+    jx.save();
+    jx.translate(CX,CY);
+    jx.beginPath();
+    for(let i=0;i<=WAVE_PTS;i++){
+      const a = (i/WAVE_PTS)*Math.PI*2;
+      const noise = Math.sin(a*8-jt*2)*pulse*0.4
+                  + Math.sin(a*5+jt*2.2)*pulse*0.2;
+      const r = pulseR2 + noise;
+      const x = Math.cos(a)*r, y = Math.sin(a)*r;
+      i===0 ? jx.moveTo(x,y) : jx.lineTo(x,y);
+    }
+    jx.closePath();
+    jx.strokeStyle='rgba(255,77,210,0.3)';
+    jx.lineWidth=1;
+    jx.shadowBlur=10;
+    jx.shadowColor='rgba(255,77,210,0.6)';
+    jx.stroke();
+    jx.restore();
+
+    // ── Floating data nodes ──
+    nodes.forEach(n=>{
+      n.angle += n.spd;
+      const nx = CX + Math.cos(n.angle)*n.r;
+      const ny = CY + Math.sin(n.angle)*n.r;
+      jx.beginPath();
+      jx.arc(nx,ny,n.size,0,Math.PI*2);
+      jx.fillStyle=`rgba(0,229,255,${n.alpha + Math.sin(jt*2+n.angle)*0.2})`;
+      jx.shadowBlur=8;
+      jx.shadowColor='rgba(0,229,255,0.9)';
+      jx.fill();
+      // connector line to center
+      jx.beginPath();
+      jx.moveTo(CX,CY);
+      jx.lineTo(nx,ny);
+      jx.strokeStyle=`rgba(0,229,255,${0.04 + Math.sin(jt+n.angle)*0.03})`;
+      jx.lineWidth=0.5;
+      jx.shadowBlur=0;
+      jx.stroke();
+    });
+
+    // ── Tick marks on outer ring ──
+    jx.save();
+    jx.translate(CX,CY);
+    for(let i=0;i<60;i++){
+      const a = (i/60)*Math.PI*2;
+      const isMajor = i%5===0;
+      const inner = isMajor ? 93 : 95;
+      const outer = 98;
+      const active = Math.sin(jt*3+i*0.4)>0.3;
+      jx.beginPath();
+      jx.moveTo(Math.cos(a)*inner, Math.sin(a)*inner);
+      jx.lineTo(Math.cos(a)*outer, Math.sin(a)*outer);
+      jx.strokeStyle = active
+        ? (isMajor ? 'rgba(0,229,255,0.9)' : 'rgba(0,229,255,0.5)')
+        : 'rgba(0,229,255,0.1)';
+      jx.lineWidth = isMajor ? 1.5 : 0.8;
+      jx.shadowBlur = active && isMajor ? 8 : 0;
+      jx.shadowColor = 'rgba(0,229,255,1)';
+      jx.stroke();
+    }
+    jx.restore();
+
+    // ── Core reactor ──
+    const coreR = 8 + Math.sin(jt*2)*1.5;
+    const coreGrad = jx.createRadialGradient(CX,CY,0, CX,CY,coreR*2.5);
+    coreGrad.addColorStop(0,'rgba(255,255,255,1)');
+    coreGrad.addColorStop(0.3,'rgba(180,255,255,0.95)');
+    coreGrad.addColorStop(0.7,'rgba(0,229,255,0.6)');
+    coreGrad.addColorStop(1,'rgba(0,229,255,0)');
+    jx.beginPath();
+    jx.arc(CX,CY,coreR*2.5,0,Math.PI*2);
+    jx.fillStyle=coreGrad;
+    jx.shadowBlur=30;
+    jx.shadowColor='rgba(0,229,255,1)';
+    jx.fill();
+
+    // Core solid dot
+    jx.beginPath();
+    jx.arc(CX,CY,coreR,0,Math.PI*2);
+    jx.fillStyle='rgba(220,255,255,1)';
+    jx.fill();
+
+    // ── Radial beam spokes ──
+    const spokeCount = 6;
+    for(let i=0;i<spokeCount;i++){
+      const a = (i/spokeCount)*Math.PI*2 + jt*0.08;
+      const len = 35 + Math.sin(jt*2.5+i)*12;
+      const alpha = 0.08 + Math.sin(jt*1.8+i*1.1)*0.05;
+      jx.beginPath();
+      jx.moveTo(CX,CY);
+      jx.lineTo(CX+Math.cos(a)*len, CY+Math.sin(a)*len);
+      jx.strokeStyle=`rgba(0,229,255,${alpha})`;
+      jx.lineWidth=0.8;
+      jx.shadowBlur=0;
+      jx.stroke();
+    }
+
+    jt += 0.016;
+    requestAnimationFrame(drawJarvis);
+  }
+  drawJarvis();
+})();
+</script>
+</body>
+</html>
